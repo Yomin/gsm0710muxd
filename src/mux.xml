@@ -1,0 +1,56 @@
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<!-- # xml does not allow double-dash in comments :/
+dbus-binding-tool -\
+-mode=glib-server -\
+-prefix=mux src/mux.xml > src/mux.h
+-->
+<node>
+	<!-- interface to a channel muxer as described in gsm07.10.
+	several pseudo ttys are muxed to one serial line. -->
+	<interface name="org.freesmartphone.GSM.MUX">
+		<annotation name="org.freedesktop.DBus.GLib.CSymbol" value="muxer_control"/>
+		<!-- switch modem on/off -->
+		<method name="SetPower">
+			<annotation name="org.freedesktop.DBus.GLib.CSymbol" value="muxer_control_set_power"/>
+			<!-- origin of the call (see AllocChannel) -->
+			<arg name="origin" type="s" direction="in"/>
+			<!-- switch on? -->
+			<arg name="on" type="b" direction="in"/>
+		</method>
+		<!-- get if modem is onor off -->
+		<method name="GetPower">
+			<annotation name="org.freedesktop.DBus.GLib.CSymbol" value="muxer_control_get_power"/>
+			<!-- origin of the call (see AllocChannel) -->
+			<arg name="origin" type="s" direction="in"/>
+			<!-- current state -->
+			<arg name="on" type="b" direction="out"/>
+		</method>
+		<!-- reset modem -->
+		<method name="Reset">
+			<annotation name="org.freedesktop.DBus.GLib.CSymbol" value="muxer_control_reset_modem"/>
+			<!-- origin of the call (see AllocChannel) -->
+			<arg name="origin" type="s" direction="in"/>
+		</method>
+		<!-- allocate a muxed channel -->
+		<method name="AllocChannel">
+			<annotation name="org.freedesktop.DBus.GLib.CSymbol" value="muxer_control_alloc_channel"/>
+			<!-- for now the origin will be used for logging only. you will
+			see which channels are closed not only by number but with an
+			explaining name like 'ppp'. future use may be to allocate a
+			special channel because some modems allow some operations on a
+			concret channel number only. -->
+			<arg name="origin" type="s" direction="in"/>
+			<!-- unix device for this channel -->
+			<arg name="channel" type="s" direction="out"/>
+		</method>
+		<!--
+		<method name="ListChannels">
+			<arg name="id" type="a{io}" direction="out"/>
+		</method>
+		<method name="CloseChannel">
+			<arg name="id" type="i" direction="in"/>
+		</method>
+		-->
+	</interface>
+</node>

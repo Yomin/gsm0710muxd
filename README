@@ -1,0 +1,15 @@
+This is a user space multiplexer for GSM according to the
+GSM 07.10 specification. Right now it contains some hardcoded
+paths for the Openmoko Neo devices, it should work with all
+kinds of modems that understand the +CMUX operation mode.
+
+Please send patches to smartphones-standards@lists.linuxtogo.org
+
+See src/gsm0710muxd.c for how to use it.
+
+Although gsm0710muxd has dbus system bus activation support, for now
+you need to start it manually because it expects the -x parameter
+(path to GSM power and reset sysfs nodes). 
+
+:M:
+

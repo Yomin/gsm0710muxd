@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.pyneo.muxer
+Exec=@sbindir@/gsm0710muxd
+User=root

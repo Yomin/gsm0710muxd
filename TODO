@@ -1,0 +1,10 @@
+1.0:
+* Remove VC-not-getting-opened workaround and solve problem
+* Documentation
+* Project site @ fs.o wiki
+* Dbus Error handling
+
+1.1:
+* Automatic device detection and/or device plugins?
+* More support for working around different modems' problems
+

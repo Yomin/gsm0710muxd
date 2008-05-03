@@ -1,0 +1,25 @@
+#!/bin/sh -e
+NAME=gsm0710muxd
+SYSROOTOPT="-x /sys/bus/platform/devices/neo1973-pm-gsm.0"
+case "$1" in
+	start)
+		start-stop-daemon --start --pidfile /var/run/${NAME}.pid \
+		--make-pidfile --background --startas /usr/sbin/$NAME -- \
+		$SYSROOTOPT -f 100
+	;;
+	stop)
+		start-stop-daemon --stop --pidfile /var/run/${NAME}.pid \
+		--oknodo
+		rm -f /var/run/${NAME}.pid
+	;;
+	restart)
+		$0 stop
+		sleep 1
+		exec $0 start
+	;;
+	*)
+		echo "Usage: $0 {start|stop}" >&2
+		exit 1
+	;;
+esac
+exit 0

@@ -1,0 +1,43 @@
+2008-05-03	Michael Dietrich	<mdt@emdete.de>
+
+	* work around logic channel 1 opening bug and try to reclaim it
+
+2008-04-28	Michael Dietrich	<mdt@emdete.de>
+
+	* marcel holtmanns patch applied
+	* error checks on snprintf
+	* auto detect pm path
+
+2008-04-28	Michael Lauer	<mickey@openmoko.org>
+
+	* Add power management functions (emdete)
+	* Improve stability (emdete)
+	* Change API to org.freesmartphone.GSM.MUX
+	* Release as 0.9.1
+
+2008-03-28	Michael Lauer	<mickey@openmoko.org>
+
+	* Clean up build, release as 0.9.0
+
+2008-02-28	Michael Lauer	<mickey@openmoko.org>
+
+	* src/gsm0710muxd.c: catch up with device node changes in openmoko-kernel 2.6.24
+
+2008-02-17	Michael Lauer	<mickey@openmoko.org>
+
+	* data/Makefile.am: fix invalid directory, system services
+	go into dbus system-services directory
+
+2008-02-07	Michael Lauer	<mickey@openmoko.org>
+
+	* configure.ac data/Makefile.am data/org.freedesktop.GSM.MUX.service.in:
+	ship dbus service file
+	* data/gsm0710muxd: remove useless init script, activation goes via dbus now
+
+2008-02-05	Michael Lauer	<mickey@openmoko.org>
+
+	* data/Makefile.am: ship dbus service configuration file
+
+2008-01-15	Michael Lauer 	<mickey@openmoko.org>
+
+	* Autotoolize
