@@ -1,6 +1,12 @@
-1.0:
+0.9.8:
+* make power cycle on startup and power-off on shutdown optional
+* document or fix virtual channel behaviour (state is preserved)
+
+0.9.9:
 * Remove VC-not-getting-opened workaround and solve problem
 * Don't assume the modem is in AT mode, make seamless MUX-restart possible
+
+1.0:
 * Documentation
 * Project site @ fs.o wiki
 * Dbus Error handling
