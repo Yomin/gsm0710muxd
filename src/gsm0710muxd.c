@@ -1542,7 +1542,7 @@ static int modem_hw_on(const char* pm_base_dir)
 	SYSCHECK(modem_hw_(pm_base_dir, "reset", 1));
 	sleep(1);
 	SYSCHECK(modem_hw_(pm_base_dir, "reset", 0));
-	sleep(1);
+	sleep(4);
 	LOG(LOG_DEBUG, "Leave");
 	return 0;
 }
