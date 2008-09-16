@@ -1,3 +1,7 @@
+2008-09-16	Michael Lauer	<mickey@openmoko.org>
+
+	* Release as 0.9.2
+
 2008-05-03	Michael Dietrich	<mdt@emdete.de>
 
 	* work around logic channel 1 opening bug and try to reclaim it
