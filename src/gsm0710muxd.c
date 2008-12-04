@@ -194,7 +194,7 @@ typedef struct Serial
  * tells how much free space there is in the buffer
  */
 //int gsm0710_buffer_free(GSM0710_Buffer *buf);
-#define gsm0710_buffer_free(buf) ((buf->readp > buf->writep) ? (buf->readp - buf->writep) : (GSM0710_BUFFER_SIZE - (buf->writep-buf->readp)))
+#define gsm0710_buffer_free(buf) ((buf->readp > buf->writep) ? (buf->readp - buf->writep) : (GSM0710_BUFFER_SIZE - (buf->writep-buf->readp)) - 1)
 
 ////////////////////////////////// constants & globals
 static unsigned char close_channel_cmd[] = { GSM0710_CONTROL_CLD | GSM0710_CR, GSM0710_EA | (0 << 1) };
