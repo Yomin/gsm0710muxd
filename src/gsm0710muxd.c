@@ -228,6 +228,7 @@ static const unsigned char r_crctable[] = {//reversed, 8-bit, poly=0x07
 	0x57, 0xC6, 0xB3, 0x22, 0x50, 0xC1, 0xBA, 0x2B, 0x59, 0xC8, 0xBD,
 	0x2C, 0x5E, 0xCF, };
 // config stuff
+static char* version = "0.9.2.1";
 static char* revision = "$Rev: 295 $";
 static int no_daemon = 1;
 static int pin_code = -1;
@@ -1797,25 +1798,46 @@ static gboolean watchdog(gpointer data)
 static int usage(
 	char *_name)
 {
-	fprintf(stderr, "\tUsage: %s [options]\n", _name);
-	fprintf(stderr, "Options:\n");
+	fprintf(stdout, "Usage: %s [options]\n", _name);
+	fprintf(stdout, "Options:\n");
 	// process control
-	fprintf(stderr, "\t-d: Fork, get a daemon [%s]\n", no_daemon?"no":"yes");
-	fprintf(stderr, "\t-v: verbose logging\n");
+	fprintf(stdout, "\t-d: Fork, get a daemon [%s]\n", no_daemon?"no":"yes");
+	fprintf(stdout, "\t-v: verbose logging\n");
 	// modem control
-	fprintf(stderr, "\t-s <serial port name>: Serial port device to connect to [%s]\n", serial.devicename);
-	fprintf(stderr, "\t-t <timeout>: reset modem after this number of seconds of silence [%d]\n", use_timeout);
-	fprintf(stderr, "\t-P <pin-code>: PIN code to unlock SIM [%d]\n", pin_code);
-	fprintf(stderr, "\t-p <number>: use ping and reset modem after this number of unanswered pings [%d]\n", use_ping);
-	fprintf(stderr, "\t-x <dir>: power managment base dir [%s]\n", serial.pm_base_dir?serial.pm_base_dir:"<not set>");
+	fprintf(stdout, "\t-s <serial port name>: Serial port device to connect to [%s]\n", serial.devicename);
+	fprintf(stdout, "\t-t <timeout>: reset modem after this number of seconds of silence [%d]\n", use_timeout);
+	fprintf(stdout, "\t-P <pin-code>: PIN code to unlock SIM [%d]\n", pin_code);
+	fprintf(stdout, "\t-p <number>: use ping and reset modem after this number of unanswered pings [%d]\n", use_ping);
+	fprintf(stdout, "\t-x <dir>: power managment base dir [%s]\n", serial.pm_base_dir?serial.pm_base_dir:"<not set>");
 	// legacy - will be removed
-	fprintf(stderr, "\t-b <baudrate>: mode baudrate [%d]\n", baud_rates[cmux_port_speed]);
-	fprintf(stderr, "\t-m <modem>: Mode (basic, advanced) [%s]\n", cmux_mode?"advanced":"basic");
-	fprintf(stderr, "\t-f <framsize>: Frame size [%d]\n", cmux_N1);
+	fprintf(stdout, "\t-b <baudrate>: mode baudrate [%d]\n", baud_rates[cmux_port_speed]);
+	fprintf(stdout, "\t-m <modem>: Mode (basic, advanced) [%s]\n", cmux_mode?"advanced":"basic");
+	fprintf(stdout, "\t-f <framsize>: Frame size [%d]\n", cmux_N1);
 	//
-	fprintf(stderr, "\t-h: Show this help message and show current settings.\n");
+	fprintf(stdout, "\t-h: Show this help message and show current settings.\n");
+	fprintf(stdout, "\t-V: Show the version number.\n");
 	return -1;
 }
+
+/**
+ * shows this program version
+ */
+static int show_version(
+	char *_name)
+{
+	fprintf(stdout, "This is the freesmartphone.org version of pyneo's %s %s\n", _name, version);
+	fprintf(stdout, "\n");
+	fprintf(stdout, "Copyright (C) 2003, 2006 Tuukka Karvonen <tkarvone@iki.fi>\n");
+	fprintf(stdout, "Copyright (C) 2004 David Jander <david@protonic.nl>\n");
+	fprintf(stdout, "Copyright (C) 2006 Antti Haapakoski <antti.haapakoski@iki.fi>\n");
+	fprintf(stdout, "Copyright (C) 2006 Vasiliy Novikov <vn@hotbox.ru>\n");
+	fprintf(stdout, "Copyright (C) 2008 M. Dietrich <mdt@emdete.de>\n");
+	fprintf(stdout, "\n");
+	fprintf(stdout, "This is free software; see the source for copying conditions.  There is NO\n");
+	fprintf(stdout, "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n");
+	return -1;
+}
+
 
 /**
  * The main program
@@ -1830,7 +1852,7 @@ int main(
 	pid_t parent_pid;
 //for fault tolerance
 	serial.devicename = "/dev/ttySAC0";
-	while ((opt = getopt(argc, argv, "dvs:t:p:f:h?m:b:P:x:")) > 0)
+	while ((opt = getopt(argc, argv, "dvs:t:p:f:Vh?m:b:P:x:")) > 0)
 	{
 		switch (opt)
 		{
@@ -1869,6 +1891,10 @@ int main(
 			break;
 		case 'b':
 			cmux_port_speed = baud_rate_index(atoi(optarg));
+			break;
+		case 'V':
+			show_version(argv[0]);
+			exit(0);
 			break;
 		default:
 		case '?':
