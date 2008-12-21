@@ -114,6 +114,7 @@ DBusConnection* dbus_g_connection_get_connection(DBusGConnection *gconnection); 
 // enabled The value is in seconds
 #define GSM0710_POLLING_INTERVAL 5
 #define GSM0710_BUFFER_SIZE 2048
+#define PTY_GLIB_BUFFER_SIZE (16*1024)
 
 ////////////////////////////////////////////////////// types
 //
@@ -153,6 +154,7 @@ typedef struct Channel
 	int remaining;
 	unsigned char *tmp;
 	guint g_source;
+	GIOChannel* g_channel;
 } Channel;
 
 typedef enum MuxerStates 
@@ -687,8 +689,10 @@ static gboolean c_alloc_channel(const char* origin, const char** name)
 					SYSCHECK(unlockpt(channellist[i].fd));
 				}
 				channellist[i].v24_signals = GSM0710_SIGNAL_DV | GSM0710_SIGNAL_RTR | GSM0710_SIGNAL_RTC | GSM0710_EA;
-				GIOChannel* g_channel = g_io_channel_unix_new(channellist[i].fd);
-				channellist[i].g_source = g_io_add_watch(g_channel, G_IO_IN | G_IO_HUP, pseudo_device_read, channellist+i);
+				channellist[i].g_channel = g_io_channel_unix_new(channellist[i].fd);
+				g_io_channel_set_encoding(channellist[i].g_channel, NULL, NULL );
+				g_io_channel_set_buffer_size( channellist[i].g_channel, PTY_GLIB_BUFFER_SIZE );
+				channellist[i].g_source = g_io_add_watch(channellist[i].g_channel, G_IO_IN | G_IO_HUP, pseudo_device_read, channellist+i);
 				write_frame(i, NULL, 0, GSM0710_TYPE_SABM | GSM0710_PF);
 				LOG(LOG_INFO, "Connecting %s to virtual channel %d for %s on %s",
 					channellist[i].ptsname, channellist[i].id, channellist[i].origin, serial.devicename);
@@ -1372,9 +1376,15 @@ int extract_frames(
 			LOG(LOG_DEBUG, "Frame is UI or UIH");
 			if (frame->channel > 0)
 			{
+				gsize written;
 				LOG(LOG_DEBUG, "Frame channel > 0, pseudo channel");
 //data from logical channel
-				write(channellist[frame->channel].fd, frame->data, frame->length);
+				g_io_channel_write_chars(channellist[frame->channel].g_channel, (gchar*)frame->data, (gssize)frame->length, &written, NULL);
+				if (written != frame->length)
+					LOG(LOG_WARNING, "Pty write buffer overflow, data loss: needed to write %d bytes, written %d, channel %d", frame->length, written, frame->channel);
+				else
+					LOG(LOG_DEBUG, "Written %d bytes to pty channel %d", written, frame->channel);
+				g_io_channel_flush(channellist[frame->channel].g_channel, NULL );
 			}
 			else
 			{
@@ -1740,6 +1750,7 @@ static int close_devices()
 
 static gboolean watchdog(gpointer data)
 {
+	int i;
 	LOG(LOG_DEBUG, "Enter");
 	Serial* serial = (Serial*)data;
 	LOG(LOG_DEBUG, "Serial state is %d", serial->state);
@@ -1748,13 +1759,16 @@ static gboolean watchdog(gpointer data)
 	case MUX_STATE_OPENING:
 		if (open_serial_device(serial) < 0)
 			LOG(LOG_WARNING, "Could not open all devices and start muxer");
-		serial->g_source_watchdog = g_timeout_add_seconds(5, watchdog, data); // let the dog watch every 5 sec
+		serial->g_source_watchdog = g_timeout_add_seconds(1, watchdog, data); // let the dog watch every 1 sec
 		LOG(LOG_INFO, "Watchdog started");
 	case MUX_STATE_INITILIZING:
 		if (start_muxer(serial) < 0)
 			LOG(LOG_WARNING, "Could not open all devices and start muxer errno=%d", errno);
 	break;
 	case MUX_STATE_MUXING:
+		for (i=1;i<GSM0710_MAX_CHANNELS;i++)
+			if (channellist[i].fd >= 0)
+				g_io_channel_flush(channellist[i].g_channel, NULL);
 		if (use_ping)
 		{
 			if (serial->ping_number > use_ping)
