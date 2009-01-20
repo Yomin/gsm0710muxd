@@ -148,6 +148,7 @@ typedef struct Channel
 	char* devicename;
 	int fd;
 	int opened;
+	int frames_allowed;
 	unsigned char v24_signals;
 	char* ptsname;
 	char* origin;
@@ -289,6 +290,12 @@ static int baud_rate_index(
 		if (baud_rates[i] == baud_rate)
 			return i;
 	return -1;
+}
+
+gboolean glib_returnfalse(
+       gpointer data)
+{
+       return FALSE;
 }
 
 /**
@@ -525,6 +532,36 @@ static int handle_channel_data(
 
 static int logical_channel_close(Channel* channel)
 {
+	guint timeout_id;
+	GSource *timeout_source;
+	int write_retries;
+
+	LOG(LOG_DEBUG, "Enter");
+	if (channel->opened)
+	{
+		LOG(LOG_INFO, "Logical channel %d for %s closing", channel->id, channel->origin);
+		for (write_retries=0; write_retries<GSM0710_WRITE_RETRIES; write_retries++)
+		{
+			if (cmux_mode)
+				write_frame(channel->id, NULL, 0, GSM0710_TYPE_DISC | GSM0710_PF);
+			else
+				write_frame(channel->id, close_channel_cmd, 2, GSM0710_TYPE_UIH);
+			timeout_id = g_timeout_add_seconds(3, glib_returnfalse, NULL);
+			timeout_source = g_main_context_find_source_by_id(NULL, timeout_id);
+			do
+			{
+				LOG(LOG_DEBUG, "g_main_context_iteration");
+				g_main_context_iteration(NULL, TRUE);
+			}
+			while (channel->opened && !g_source_is_destroyed(timeout_source));
+			if (!channel->opened)
+				break;
+		} 
+		/* No need to explicitly destroy this source */
+		if (channel->opened)
+			LOG(LOG_WARNING, "Unable to properly close a channel");
+	}
+
 	if (channel->g_source >= 0)
 		g_source_remove(channel->g_source);
 	channel->g_source = -1;
@@ -541,6 +578,7 @@ static int logical_channel_close(Channel* channel)
 		free(channel->origin);
 	channel->origin = NULL;
 	channel->opened = 0;
+	channel->frames_allowed = 0;
 	channel->v24_signals = 0;
 	channel->remaining = 0;
 	return 0;
@@ -555,6 +593,7 @@ static int logical_channel_init(Channel* channel, int id)
 	channel->ptsname = NULL;
 	channel->tmp = NULL;
 	channel->origin = NULL;
+	channel->opened = 0;
 	return logical_channel_close(channel);
 }
 
@@ -595,21 +634,11 @@ gboolean pseudo_device_read(GIOChannel *source, GIOCondition condition, gpointer
 			return TRUE;
 		}
 		// dropped connection
-		if (cmux_mode)
-			write_frame(channel->id, NULL, 0, GSM0710_CONTROL_CLD | GSM0710_CR);
-		else
-			write_frame(channel->id, close_channel_cmd, 2, GSM0710_TYPE_UIH);
 		logical_channel_close(channel);
-		LOG(LOG_INFO, "Logical channel %d for %s closed", channel->id, channel->origin);
 	}
 	else if (condition == G_IO_HUP)
 	{
-		if (cmux_mode)
-			write_frame(channel->id, NULL, 0, GSM0710_CONTROL_CLD | GSM0710_CR);
-		else
-			write_frame(channel->id, close_channel_cmd, 2, GSM0710_TYPE_UIH);
 		logical_channel_close(channel);
-		LOG(LOG_INFO, "Logical channel %d for %s closed", channel->id, channel->origin);
 	}
 	LOG(LOG_DEBUG, "Leave");
 	return FALSE;
@@ -666,6 +695,9 @@ static gboolean c_alloc_channel(const char* origin, const char** name)
 {
 	LOG(LOG_DEBUG, "Enter");
 	int i;
+	guint timeout_id;
+	GSource *timeout_source;
+	int write_retries;
 	if (serial.state == MUX_STATE_MUXING)
 		for (i=1;i<GSM0710_MAX_CHANNELS;i++)
 			if (channellist[i].fd < 0) // is this channel free?
@@ -693,10 +725,30 @@ static gboolean c_alloc_channel(const char* origin, const char** name)
 				g_io_channel_set_encoding(channellist[i].g_channel, NULL, NULL );
 				g_io_channel_set_buffer_size( channellist[i].g_channel, PTY_GLIB_BUFFER_SIZE );
 				channellist[i].g_source = g_io_add_watch(channellist[i].g_channel, G_IO_IN | G_IO_HUP, pseudo_device_read, channellist+i);
-				write_frame(i, NULL, 0, GSM0710_TYPE_SABM | GSM0710_PF);
 				LOG(LOG_INFO, "Connecting %s to virtual channel %d for %s on %s",
 					channellist[i].ptsname, channellist[i].id, channellist[i].origin, serial.devicename);
 				*name = strdup(channellist[i].ptsname);
+				for (write_retries=0; write_retries<GSM0710_WRITE_RETRIES; write_retries++)
+				{
+					write_frame(i, NULL, 0, GSM0710_TYPE_SABM | GSM0710_PF);
+					timeout_id = g_timeout_add_seconds(3, glib_returnfalse, NULL);
+					timeout_source = g_main_context_find_source_by_id(NULL, timeout_id);
+					do
+					{
+						LOG(LOG_DEBUG, "g_main_context_iteration");
+						g_main_context_iteration(NULL, TRUE);
+					}
+					while (!channellist[i].frames_allowed && !g_source_is_destroyed(timeout_source));
+					if (channellist[i].opened)
+						break;
+				} 
+				/* No need to explicitly destroy this source */
+				if (!channellist[i].frames_allowed)
+				{
+					LOG(LOG_INFO, "Unable to open the new channel %d", i);
+					logical_channel_close(&channellist[i]);
+					return FALSE;
+				}
 				return TRUE;
 			}
 	LOG(LOG_WARNING, "not muxing or no free channel found");
@@ -1291,6 +1343,7 @@ static int handle_command(
 					{
 //op.arg |= USSP_CTS;
 						LOG(LOG_DEBUG, "Frames allowed");
+						channellist[channel].frames_allowed = 1;
 					}
 					if ((signals & GSM0710_SIGNAL_RTC) == GSM0710_SIGNAL_RTC)
 					{
@@ -1403,9 +1456,9 @@ int extract_frames(
 				LOG(LOG_DEBUG, "Frame is UA");
 				if (channellist[frame->channel].opened)
 				{
-					SYSCHECK(logical_channel_close(channellist+frame->channel));
 					LOG(LOG_INFO, "Logical channel %d for %s closed",
 						frame->channel, channellist[frame->channel].origin);
+					channellist[frame->channel].opened = 0;
 				}
 				else
 				{
@@ -1721,11 +1774,6 @@ static int close_devices()
 			if (channellist[i].opened)
 			{
 				LOG(LOG_INFO, "Closing down the logical channel %d", i);
-				if (cmux_mode)
-					write_frame(i, NULL, 0, GSM0710_CONTROL_CLD | GSM0710_CR);
-//multiplexer close down command doesn't work with benqM22a module, use: write_frame(0, NULL, 0, GSM0710_TYPE_DISC | GSM0710_PF);
-				else
-					write_frame(i, close_channel_cmd, 2, GSM0710_TYPE_UIH);
 				SYSCHECK(logical_channel_close(channellist+i));
 			}
 			LOG(LOG_INFO, "Logical channel %d closed", channellist[i].id);
@@ -1972,7 +2020,8 @@ int main(
 	g_main_loop_run(main_loop); // will/may be terminated in signal_treatment
 	g_main_loop_unref(main_loop);
 //finalize everything
-	SYSCHECK(close_devices());
+//	Don't bother with closing devices, mainloop is not running anymore
+//	SYSCHECK(close_devices());
 	free(serial.adv_frame_buf);
 	gsm0710_buffer_destroy(serial.in_buf);
 	LOG(LOG_INFO, "Received %ld frames and dropped %ld received frames during the mux-mode",
