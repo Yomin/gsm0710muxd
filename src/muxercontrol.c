@@ -53,13 +53,15 @@ gboolean muxer_control_get_power (MuxerControl* self, const char* origin, gboole
 }
 
 
-gboolean muxer_control_alloc_channel (MuxerControl* self, const char* origin, const char* channel) {
+gboolean muxer_control_alloc_channel (MuxerControl* self, const char* origin, const char* channel, GError** error) {
 	g_return_val_if_fail (IS_MUXER_CONTROL (self), FALSE);
 	g_return_val_if_fail (origin != NULL, FALSE);
 	g_return_val_if_fail (channel != NULL, FALSE);
-	return c_alloc_channel (origin, channel);
+	gboolean success = c_alloc_channel (origin, channel);
+	if (!success)
+		g_set_error( error, DBUS_GERROR, 0xdeadbeef, "org.freesmartphone.GSM.MUX.NoChannel", "All channels are used" );
+	return success;
 }
-
 
 MuxerControl* muxer_control_gen (void) {
 	return muxer_control_new ();
