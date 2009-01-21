@@ -10,6 +10,39 @@
 
 
 
+enum {
+	MUXER_ALLOC_ERROR
+} MuxerError;
+
+#define MUXER_ERROR ( muxer_error_quark() )
+#define MUXER_ERROR_TYPE ( muxer_error_get_type() )
+
+#define ENUM_ENTRY(NAME, DESC) { NAME, "" #NAME "", DESC }
+
+static GQuark muxer_error_quark(void)
+{
+	static GQuark quark = 0;
+	if (!quark)
+		quark = g_quark_from_static_string("muxer");
+
+	return quark;
+}
+
+static GType muxer_error_get_type(void)
+{
+	static GType etype = 0;
+	if (etype == 0) {
+		static const GEnumValue values[] = {
+			ENUM_ENTRY(MUXER_ALLOC_ERROR, "NoChannel"),
+			{ 0, 0, 0 }
+		};
+
+		etype = g_enum_register_static("muxer", values);
+	}
+
+return etype;
+}
+
 
 enum  {
 	MUXER_CONTROL_DUMMY_PROPERTY
@@ -59,11 +92,12 @@ gboolean muxer_control_alloc_channel (MuxerControl* self, const char* origin, co
 	g_return_val_if_fail (channel != NULL, FALSE);
 	gboolean success = c_alloc_channel (origin, channel);
 	if (!success)
-		g_set_error( error, DBUS_GERROR, 0xdeadbeef, "org.freesmartphone.GSM.MUX.NoChannel", "All channels are used" );
+		g_set_error( error, MUXER_ERROR, MUXER_ALLOC_ERROR, "All channels are used" );
 	return success;
 }
 
 MuxerControl* muxer_control_gen (void) {
+	dbus_g_error_domain_register(MUXER_ERROR, "org.freesmartphone.GSM.MUX", MUXER_ERROR_TYPE);
 	return muxer_control_new ();
 }
 

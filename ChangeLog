@@ -1,3 +1,13 @@
+2009-01-21	Michael Lauer	<mlauer@vanille-media.de>
+
+	* Send org.freesmartphone.MUX.NoChannel, if we AllocChannel fails
+	* Bring back closing the device after mainloop quits
+	* Release as 0.9.3
+
+2009-01-21	Paul Fertser	<fercerpav@gmail.com>
+
+	* 0001-Implement-proper-channel-allocation-and-dealloction.patch
+
 2009-01-10	Michael Lauer	<mlauer@vanille-media.de>
 
 	* Release as 0.9.2.2
