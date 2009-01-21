@@ -1,6 +1,7 @@
 2009-01-21	Michael Lauer	<mlauer@vanille-media.de>
 
-	* Send org.freesmartphone.MUX.NoChannel, if we AllocChannel fails
+	* Send org.freesmartphone.GSM.MUX.NoChannel, if AllocChannel fails
+	to allocate a new virtual channel.
 	* Bring back closing the device after mainloop quits
 	* Release as 0.9.3
 
