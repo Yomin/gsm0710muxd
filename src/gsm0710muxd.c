@@ -2020,8 +2020,7 @@ int main(
 	g_main_loop_run(main_loop); // will/may be terminated in signal_treatment
 	g_main_loop_unref(main_loop);
 //finalize everything
-//	Don't bother with closing devices, mainloop is not running anymore
-//	SYSCHECK(close_devices());
+	SYSCHECK(close_devices());
 	free(serial.adv_frame_buf);
 	gsm0710_buffer_destroy(serial.in_buf);
 	LOG(LOG_INFO, "Received %ld frames and dropped %ld received frames during the mux-mode",
