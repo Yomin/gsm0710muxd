@@ -1764,6 +1764,10 @@ static int close_devices()
 	g_source_remove(serial.g_source);
 	serial.g_source = -1;
 	int i;
+// don't bother closing the channels over the MUX protocol, first off,
+// the mainloop is no longer running anyways, second, we're about to
+// shutdown the modem completely in a second.
+#if 0
 	for (i=1;i<GSM0710_MAX_CHANNELS;i++)
 	{
 //terminate command given. Close channels one by one and finaly close
@@ -1779,6 +1783,7 @@ static int close_devices()
 			LOG(LOG_INFO, "Logical channel %d closed", channellist[i].id);
 		}
 	}
+#endif
 	if (serial.fd >= 0)
 	{
 		if (cmux_mode)
