@@ -1,15 +1,23 @@
+NOTE: This is the FSO branch of pyneo's gsm0710muxd. FSO
+branched around version 0.9.1 in order to no have to change
+dbus interfaces and power handling in ogsmd.
+
+It is planned to merge with upstream after 1.0, although
+they have slightly different goals.
+
 This is a user space multiplexer for GSM according to the
-GSM 07.10 specification. Right now it contains some hardcoded
+GSM 07.10 specification. Although it contains some hardcoded
 paths for the Openmoko Neo devices, it should work with all
 kinds of modems that understand the +CMUX operation mode.
 
 Please send patches to smartphones-standards@lists.linuxtogo.org
 
-See src/gsm0710muxd.c for how to use it.
+gsm0710muxd has dbus system bus activation support, API docs
+are at http://docs.freesmartphone.org -> org.freesmartphone.GSM.MUX
 
-Although gsm0710muxd has dbus system bus activation support, for now
-you need to start it manually because it expects the -x parameter
-(path to GSM power and reset sysfs nodes). 
+NOTE: This is the FSO branch of pyneo's gsm0710muxd. Upstream
+continued to develop gsm0710muxd elsewhere. We're planning
+to merge with upstream again at some point of time.
 
 :M:
 
