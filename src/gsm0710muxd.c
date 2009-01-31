@@ -1437,9 +1437,9 @@ int extract_frames(
 //data from logical channel
 				g_io_channel_write_chars(channellist[frame->channel].g_channel, (gchar*)frame->data, (gssize)frame->length, &written, NULL);
 				if (written != frame->length)
-					LOG(LOG_WARNING, "Pty write buffer overflow, data loss: needed to write %d bytes, written %d, channel %d", frame->length, written, frame->channel);
+					LOG(LOG_WARNING, "Pty write buffer overflow, data loss: needed to write %d bytes, written %d, channel %d", frame->length, (int)written, frame->channel);
 				else
-					LOG(LOG_DEBUG, "Written %d bytes to pty channel %d", written, frame->channel);
+					LOG(LOG_DEBUG, "Written %d bytes to pty channel %d", (int)written, frame->channel);
 				g_io_channel_flush(channellist[frame->channel].g_channel, NULL );
 			}
 			else
