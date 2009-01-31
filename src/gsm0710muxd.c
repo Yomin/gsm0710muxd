@@ -38,6 +38,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -613,7 +614,7 @@ gboolean pseudo_device_read(GIOChannel *source, GIOCondition condition, gpointer
 			LOG(LOG_DEBUG, "Leave");
 			return TRUE;
 		}
-		if (len >= 0)
+		if (len > 0)
 		{
 			LOG(LOG_DEBUG, "Data from channel %d, %d bytes", channel->id, len);
 			if (channel->remaining > 0)
@@ -1862,6 +1863,216 @@ static gboolean watchdog(gpointer data)
 	return 1;
 }
 
+struct unixsock {
+	int listener;
+	guint source;
+	struct sock {
+		struct sock *next;
+		int fd;
+		char linebuf[128];
+		char name[64];
+		int linelen;
+		int passthru;
+		guint source;
+		GIOChannel* io_channel;
+	} *sock;
+} unixsock;
+
+int unix_connect(struct sock *s)
+{
+	int i;
+	if (serial.state != MUX_STATE_MUXING)
+		return 0;
+
+	for (i=1 ; i < GSM0710_MAX_CHANNELS; i++)
+		if (channellist[i].fd < 0) {
+			int write_retries;
+
+			LOG(LOG_DEBUG, "Found channel %d fd %d on %s", i, channellist[i].fd, channellist[i].devicename);
+			channellist[i].origin = strdup(s->name);
+			channellist[i].fd = s->fd;
+
+			channellist[i].ptsname = NULL;
+
+			channellist[i].v24_signals = GSM0710_SIGNAL_DV | GSM0710_SIGNAL_RTR | GSM0710_SIGNAL_RTC | GSM0710_EA;
+			channellist[i].g_channel = s->io_channel;
+			g_io_channel_set_encoding(channellist[i].g_channel, NULL, NULL );
+			g_io_channel_set_buffer_size( channellist[i].g_channel, PTY_GLIB_BUFFER_SIZE );
+			channellist[i].g_source = s->source;
+			LOG(LOG_INFO, "Connecting unix socket to virtual channel %d for %s on %s",
+			    channellist[i].id, channellist[i].origin, serial.devicename);
+
+			for (write_retries=0; write_retries<GSM0710_WRITE_RETRIES; write_retries++)
+			{
+				GSource *timeout_source;
+				guint timeout_id;
+				write_frame(i, NULL, 0, GSM0710_TYPE_SABM | GSM0710_PF);
+				timeout_id = g_timeout_add_seconds(3, glib_returnfalse, NULL);
+				timeout_source = g_main_context_find_source_by_id(NULL, timeout_id);
+				do
+				{
+					LOG(LOG_DEBUG, "g_main_context_iteration");
+					g_main_context_iteration(NULL, TRUE);
+				}
+				while (!channellist[i].frames_allowed && !g_source_is_destroyed(timeout_source));
+				if (channellist[i].opened)
+					break;
+			} 
+			/* No need to explicitly destroy this source */
+			if (!channellist[i].frames_allowed)
+			{
+				LOG(LOG_INFO, "Unable to open the new channel %d", i);
+				logical_channel_close(&channellist[i]);
+				return 0;
+			}
+			s->passthru = i;
+			return 1;
+		}
+	return 0;
+}
+
+void unix_cmd(struct sock *s)
+{
+	char *a;
+	char buf[100];
+
+	a = "ERROR\n";
+	if (strcasecmp(s->linebuf, "get_power") == 0) {
+		int n;
+		n = c_get_power(s->name);
+		if (n)
+			a = "OK on\n";
+		else
+			a = "OK off\n";
+	}
+	if (strncasecmp(s->linebuf, "set_power ", 10) == 0) {
+		int n = atoi(s->linebuf + 10);
+		c_set_power(s->name, n ? TRUE : FALSE);
+		a = "OK\n";
+	}
+	if (strcasecmp(s->linebuf, "reset_modem") == 0) {
+		c_reset_modem(s->name);
+		a = "OK\n";
+	}
+	if (strcasecmp(s->linebuf, "alloc_channel") == 0) {
+		const char *tty;
+		if (c_alloc_channel(s->name, &tty)) {
+			snprintf(buf, 100, "OK %s\n", tty);
+			a = buf;
+		}
+	}
+	if (strncasecmp(s->linebuf, "set_name ", 9) == 0 ) {
+		strncpy(s->name, s->linebuf+9, sizeof(s->name));
+		s->name[sizeof(s->name)-1] = 0;
+		a = "OK\n";
+	}
+	if (strcasecmp(s->linebuf, "connect") == 0) {
+		if (unix_connect(s))
+			a = "OK\n";
+	}
+	if (strcasecmp(s->linebuf, "exit") == 0) {
+		g_main_loop_quit(main_loop);
+		a = "OK\n";
+	}
+	write(s->fd, a, strlen(a));
+	return;
+}
+
+gboolean unix_read(GIOChannel *source, GIOCondition condition, gpointer data)
+{
+	struct sock *s = data;
+	int n;
+	if (s->passthru) {
+		int r;
+		r = pseudo_device_read(source, condition,
+				       channellist + s->passthru);
+		if (r)
+			return r;
+		s->fd = -1;
+		g_io_channel_unref(s->io_channel);
+		return r;
+	}
+	
+	while (( n = read(s->fd, s->linebuf + s->linelen, 1) ) == 1) {
+		if (s->linebuf[s->linelen] == '\n') {
+			s->linebuf[s->linelen] = 0;
+			s->linelen = 0;
+			unix_cmd(s);
+			return TRUE;
+		} else if (s->linelen < sizeof(s->linebuf)-2)
+			s->linelen++;
+	}
+	if (n == 0) {
+		/* EOF */
+		close(s->fd);
+		s->fd = -1;
+		g_source_remove(s->source);
+		g_io_channel_unref(s->io_channel);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+gboolean unix_accept(GIOChannel *source, GIOCondition condition, gpointer data)
+{
+	struct unixsock *u = data;
+	struct sock *s, **sp;
+	int fd;
+
+	/* free any closed socks */
+	sp = &u->sock;
+	while (  (*sp) ) {
+		if ( (*sp)->fd == -1) {
+			s = *sp;
+			*sp = s->next;
+			free(s);
+		} else
+			sp = & ( (*sp)->next );
+	}
+
+	fd = accept(u->listener, NULL, NULL);
+	if (fd < 0)
+		return TRUE;
+
+	s = malloc(sizeof(*s));
+	s->fd = fd;
+	s->next = u->sock;
+	u->sock = s;
+	s->linelen = 0;
+	s->passthru = 0;
+	strcpy(s->name, "socket");
+	s->io_channel = g_io_channel_unix_new(fd);
+	s->source = g_io_add_watch(s->io_channel, G_IO_IN, unix_read, s);
+	return TRUE;
+}
+
+void unix_listen(char *path)
+{
+	int fd;
+	struct sockaddr_un addr;
+	int um;
+
+	unixsock.listener = -1;
+	fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0)
+		return;
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path, path);
+	unlink(path);
+	um = umask(077);
+	if (bind(fd, &addr, sizeof(addr)) != 0) {
+		umask(um);
+		close(fd);
+		return;
+	}
+	umask(um);
+	listen(fd, 10);
+	fcntl(fd, F_SETFL, O_NONBLOCK | fcntl(fd, F_GETFL, 0));
+	unixsock.source = g_io_add_watch(g_io_channel_unix_new(fd), G_IO_IN, unix_accept, &unixsock);
+	unixsock.listener = fd;
+}
+
 /**
  * shows how to use this program
  */
@@ -2002,7 +2213,7 @@ int main(
 	umask(0);
 //signals treatment
 	signal(SIGHUP, signal_treatment);
-	signal(SIGPIPE, signal_treatment);
+	signal(SIGPIPE, SIG_IGN);
 	signal(SIGKILL, signal_treatment);
 	signal(SIGINT, signal_treatment);
 	signal(SIGUSR1, signal_treatment);
@@ -2012,6 +2223,7 @@ int main(
 	else
 		openlog(argv[0], LOG_NDELAY | LOG_PID, LOG_LOCAL0);
 	SYSCHECK(dbus_init());
+	unix_listen("/var/run/gsm-mux");
 //allocate memory for data structures
 	if ((serial.in_buf = gsm0710_buffer_init()) == NULL
 	 || (serial.adv_frame_buf = (unsigned char*)malloc((cmux_N1 + 3) * 2 + 2)) == NULL)
