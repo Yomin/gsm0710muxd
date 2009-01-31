@@ -86,7 +86,7 @@ gboolean muxer_control_get_power (MuxerControl* self, const char* origin, gboole
 }
 
 
-gboolean muxer_control_alloc_channel (MuxerControl* self, const char* origin, const char* channel, GError** error) {
+gboolean muxer_control_alloc_channel (MuxerControl* self, const char* origin, const char** channel, GError** error) {
 	g_return_val_if_fail (IS_MUXER_CONTROL (self), FALSE);
 	g_return_val_if_fail (origin != NULL, FALSE);
 	g_return_val_if_fail (channel != NULL, FALSE);

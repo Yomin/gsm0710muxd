@@ -40,7 +40,7 @@ void muxer_control_run (MuxerControl* self);
 gboolean muxer_control_reset_modem (MuxerControl* self, const char* origin);
 gboolean muxer_control_set_power (MuxerControl* self, const char* origin, gboolean on);
 gboolean muxer_control_get_power (MuxerControl* self, const char* origin, gboolean on);
-gboolean muxer_control_alloc_channel (MuxerControl* self, const char* origin, const char* channel, GError** error);
+gboolean muxer_control_alloc_channel (MuxerControl* self, const char* origin, const char** channel, GError** error);
 MuxerControl* muxer_control_gen (void);
 MuxerControl* muxer_control_new (void);
 GType muxer_control_get_type (void);
