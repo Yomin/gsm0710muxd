@@ -687,6 +687,7 @@ static gboolean c_reset_modem(const char* origin)
 {
 	LOG(LOG_DEBUG, "Enter");
 	LOG(LOG_INFO, "modem reset");
+	g_source_remove(serial.g_source_watchdog);
 	serial.state = MUX_STATE_CLOSING;				
 	return TRUE;
 }
