@@ -805,6 +805,7 @@ static int dbus_deinit()
 	return 0;
 }
 
+#if 0
 static int dbus_signal_send_deactivate(const char* sigvalue)
 {
 	DBusConnection* conn = dbus_g_connection_get_connection(g_conn);
@@ -839,6 +840,7 @@ static int dbus_signal_send_deactivate(const char* sigvalue)
 	dbus_message_unref(msg);
 	return 0;
 }
+#endif
 
 /**
 	GPtrArray *table = parse("(14-5),(3-7),(4-9),(33)");
@@ -1764,11 +1766,11 @@ static int close_devices()
 	LOG(LOG_DEBUG, "Enter");
 	g_source_remove(serial.g_source);
 	serial.g_source = -1;
-	int i;
 // don't bother closing the channels over the MUX protocol, first off,
 // the mainloop is no longer running anyways, second, we're about to
 // shutdown the modem completely in a second.
 #if 0
+	int i;
 	for (i=1;i<GSM0710_MAX_CHANNELS;i++)
 	{
 //terminate command given. Close channels one by one and finaly close
