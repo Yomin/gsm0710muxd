@@ -607,7 +607,8 @@ gboolean pseudo_device_read(GIOChannel *source, GIOCondition condition, gpointer
 		unsigned char buf[4096];
 		//information from virtual port
 		int len = read(channel->fd, buf + channel->remaining, sizeof(buf) - channel->remaining);
-		if (!channel->opened)
+
+		if (len > 0 && !channel->opened)
 		{
 			LOG(LOG_WARNING, "Write to a channel which wasn't acked to be open.");
 			write_frame(channel->id, NULL, 0, GSM0710_TYPE_SABM | GSM0710_PF);
